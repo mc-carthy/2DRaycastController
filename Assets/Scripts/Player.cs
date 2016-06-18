@@ -4,22 +4,24 @@ using System.Collections;
 [RequireComponent(typeof(Controller2D))]
 public class Player : MonoBehaviour {
 
-	public float jumpHeight = 4;
-	public float timeToJumpApex = 0.4f;
-	public float wallSlideSpeedMax = 3;
-	public float wallStickTime = 0.25f;
-	float timeToWallUnstick;
+	public float maxJumpHeight = 4;
+	public float minJumpHeight = 1;
+	public float timeToJumpApex = .4f;
+	float accelerationTimeAirborne = .2f;
+	float accelerationTimeGrounded = .1f;
+	float moveSpeed = 6;
 
 	public Vector2 wallJumpClimb;
 	public Vector2 wallJumpOff;
 	public Vector2 wallLeap;
 
-	float accelerationTimeAirborne = 0.4f;
-	float accelerationTimeGrounded = 0.1f;
-	float moveSpeed = 6;
+	public float wallSlideSpeedMax = 3;
+	public float wallStickTime = .25f;
+	float timeToWallUnstick;
 
 	float gravity;
-	float jumpVelocity;
+	float maxJumpVelocity;
+	float minJumpVelocity;
 	Vector3 velocity;
 	float velocityXSmoothing;
 
@@ -28,8 +30,10 @@ public class Player : MonoBehaviour {
 	void Start() {
 		controller = GetComponent<Controller2D> ();
 
-		gravity = -(2 * jumpHeight) / Mathf.Pow (timeToJumpApex, 2);
-		jumpVelocity = Mathf.Abs(gravity) * timeToJumpApex;
+		gravity = -(2 * maxJumpHeight) / Mathf.Pow (timeToJumpApex, 2);
+		maxJumpVelocity = Mathf.Abs(gravity) * timeToJumpApex;
+		minJumpVelocity = Mathf.Sqrt (2 * Mathf.Abs (gravity) * minJumpHeight);
+
 	}
 
 	void Update() {
@@ -37,10 +41,10 @@ public class Player : MonoBehaviour {
 		int wallDirX = (controller.collisions.left) ? -1 : 1;
 
 		float targetVelocityX = input.x * moveSpeed;
-		velocity.x = Mathf.SmoothDamp (velocity.x, targetVelocityX, ref velocityXSmoothing, (controller.collisions.below ? accelerationTimeGrounded : accelerationTimeAirborne));
+		velocity.x = Mathf.SmoothDamp (velocity.x, targetVelocityX, ref velocityXSmoothing, (controller.collisions.below) ? accelerationTimeGrounded : accelerationTimeAirborne);
 
 		bool wallSliding = false;
-		if ((controller.collisions.left || controller.collisions.right) && !controller.collisions.below & velocity.y < 0) {
+		if ((controller.collisions.left || controller.collisions.right) && !controller.collisions.below && velocity.y < 0) {
 			wallSliding = true;
 			if (velocity.y < -wallSlideSpeedMax) {
 				velocity.y = -wallSlideSpeedMax;
@@ -61,10 +65,6 @@ public class Player : MonoBehaviour {
 			}
 		}
 
-		if (controller.collisions.above || controller.collisions.below) {
-			velocity.y = 0;
-		}
-
 		if (Input.GetKeyDown (KeyCode.Space)) {
 			if (wallSliding) {
 				if (wallDirX == input.x) {
@@ -79,11 +79,21 @@ public class Player : MonoBehaviour {
 				}
 			}
 			if (controller.collisions.below) {
-				velocity.y = jumpVelocity;
+				velocity.y = maxJumpVelocity;
+			}
+		}
+
+		if (Input.GetKeyUp (KeyCode.Space)) {
+			if (velocity.y > minJumpVelocity) {
+				velocity.y = minJumpVelocity;
 			}
 		}
 
 		velocity.y += gravity * Time.deltaTime;
-		controller.Move (velocity * Time.deltaTime);
+		controller.Move (velocity * Time.deltaTime, input);
+
+		if (controller.collisions.above || controller.collisions.below) {
+			velocity.y = 0;
+		}
 	}
 }
